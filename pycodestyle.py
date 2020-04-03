@@ -139,7 +139,9 @@ DOCSTRING_REGEX = re.compile(r'u?r?["\']')
 EXTRANEOUS_WHITESPACE_REGEX = re.compile(r'[\[({] | [\]}),;]| :(?!=)')
 WHITESPACE_AFTER_COMMA_REGEX = re.compile(r'[,;:]\s*(?:  |\t)')
 COMPARE_SINGLETON_REGEX = re.compile(r'(\bNone|\bFalse|\bTrue)?\s*([=!]=)'
-                                     r'\s*(?(1)|(None|False|True))\b')
+                                     r'\s*(?(1)|(None|False|True))\b'
+                                     r'|(\bFalse|\bTrue)?\s(is|is not)'
+                                     r'\s*(?(4)|(False|True))\b')
 COMPARE_NEGATIVE_REGEX = re.compile(r'\b(not)\s+[^][)(}{ ]+\s+(in|is)\s')
 COMPARE_TYPE_REGEX = re.compile(r'(?:[=!]=|is(?:\s+not)?)\s+type(?:s.\w+Type'
                                 r'|\s*\(\s*([^)]*[^ )])\s*\))')
@@ -650,7 +652,7 @@ def continued_indentation(logical_line, tokens, indent_level, hang_closing,
                 if hang_closing:
                     yield start, "E133 closing bracket is missing indentation"
             elif indent[depth] and start[1] < indent[depth]:
-                if visual_indent is not True:
+                if not visual_indent:
                     # visual indent is broken
                     yield (start, "E128 continuation line "
                            "under-indented for visual indent")
@@ -660,7 +662,7 @@ def continued_indentation(logical_line, tokens, indent_level, hang_closing,
                     yield (start, "E123 closing bracket does not match "
                            "indentation of opening bracket's line")
                 hangs[depth] = hang
-            elif visual_indent is True:
+            elif visual_indent:
                 # visual indent is verified
                 indent[depth] = start[1]
             elif visual_indent in (text, str):
@@ -855,7 +857,7 @@ def missing_whitespace_around_operator(logical_line, tokens):
         if need_space:
             if start != prev_end:
                 # Found a (probably) needed space
-                if need_space is not True and not need_space[1]:
+                if not need_space and not need_space[1]:
                     yield (need_space[0],
                            "E225 missing whitespace around operator")
                 need_space = False
@@ -877,7 +879,7 @@ def missing_whitespace_around_operator(logical_line, tokens):
                 # For more info see PEP570
                 pass
             else:
-                if need_space is True or need_space[1]:
+                if need_space or need_space[1]:
                     # A needed trailing space was not found
                     yield prev_end, "E225 missing whitespace around operator"
                 elif prev_text != '**':
@@ -1344,10 +1346,13 @@ def comparison_to_singleton(logical_line, noqa):
     with "is" or "is not", never the equality operators.
 
     Okay: if arg is not None:
+    Okay: if None is arg
     E711: if arg != None:
     E711: if None == arg:
     E712: if arg == True:
-    E712: if False == arg:
+    E712: if False != arg:
+    E712: if arg is True:
+    E712: if False is not arg:
 
     Also, beware of writing if x when you really mean if x is not None
     -- e.g. when testing whether a variable or argument that defaults to
@@ -1356,17 +1361,18 @@ def comparison_to_singleton(logical_line, noqa):
     """
     match = not noqa and COMPARE_SINGLETON_REGEX.search(logical_line)
     if match:
-        singleton = match.group(1) or match.group(3)
-        same = (match.group(2) == '==')
+        singleton = match.group(1) or match.group(3) or \
+            match.group(4) or match.group(6)
+        same = (match.group(2) == '==') or (match.group(5) == 'is')
 
-        msg = "'if cond is %s:'" % (('' if same else 'not ') + singleton)
         if singleton in ('None',):
+            msg = "'if cond is %s:'" % (('' if same else 'not ') + singleton)
             code = 'E711'
         else:
             code = 'E712'
             nonzero = ((singleton == 'True' and same) or
                        (singleton == 'False' and not same))
-            msg += " or 'if %scond:'" % ('' if nonzero else 'not ')
+            msg = "'if %scond:'" % ('' if nonzero else 'not ')
         yield match.start(2), ("%s comparison to %s should be %s" %
                                (code, singleton, msg))
 
