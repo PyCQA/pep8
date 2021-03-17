@@ -1213,7 +1213,8 @@ def compound_statements(logical_line):
                               "def")
                 break
             if STARTSWITH_DEF_REGEX.match(line):
-                yield 0, "E704 multiple statements on one line (def)"
+                if line[found + 1:].strip() != '...':  # stub / typing overload
+                    yield 0, "E704 multiple statements on one line (def)"
             elif STARTSWITH_INDENT_STATEMENT_REGEX.match(line):
                 yield found, "E701 multiple statements on one line (colon)"
         prev_found = found
