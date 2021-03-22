@@ -145,7 +145,7 @@ COMPARE_NEGATIVE_REGEX = re.compile(r'\b(?<!is\s)(not)\s+[^][)(}{ ]+\s+'
                                     r'(in|is)\s')
 COMPARE_TYPE_REGEX = re.compile(r'(?:[=!]=|is(?:\s+not)?)\s+type(?:s.\w+Type'
                                 r'|\s*\(\s*([^)]*[^ )])\s*\))')
-KEYWORD_REGEX = re.compile(r'(\s*)\b(?:%s)\b(\s*)' % r'|'.join(KEYWORDS))
+KEYWORD_REGEX = re.compile(r'(\s*)\b(%s)\b(\s*)' % r'|'.join(KEYWORDS))
 OPERATOR_REGEX = re.compile(r'(?:[^,\s])(\s*)(?:[-+*/|!<=>%&^]+)(\s*)')
 LAMBDA_REGEX = re.compile(r'\blambda\b')
 HUNK_REGEX = re.compile(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@.*$')
@@ -481,17 +481,17 @@ def whitespace_around_keywords(logical_line):
     E274: True\tand False
     """
     for match in KEYWORD_REGEX.finditer(logical_line):
-        before, after = match.groups()
+        before, kw, after = match.groups()
 
-        if '\t' in before:
+        if '\t' in before and kw != "lambda":
             yield match.start(1), "E274 tab before keyword"
-        elif len(before) > 1:
+        elif len(before) > 1 and kw != "lambda":
             yield match.start(1), "E272 multiple spaces before keyword"
 
         if '\t' in after:
-            yield match.start(2), "E273 tab after keyword"
+            yield match.start(3), "E273 tab after keyword"
         elif len(after) > 1:
-            yield match.start(2), "E271 multiple spaces after keyword"
+            yield match.start(3), "E271 multiple spaces after keyword"
 
 
 @register_check
